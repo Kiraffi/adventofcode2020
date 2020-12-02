@@ -264,24 +264,28 @@ static void program(MachineState &state)
 
 std::vector<std::vector<int>> permutations;
 
-void generatePermutations(std::vector<int> picksLeft, std::vector<int> currentPick)
+void generatePermutations(std::vector<int> &picksLeft, std::vector<int> &currentPick)
 {
-	if(picksLeft.size() == 0)
+	int picksLeftCount = 0;
+	for(int i = 0; i < picksLeft.size(); ++i)
+	{
+		int input = picksLeft[i];
+		if(input != (1 << 31))
+		{
+			picksLeft[i] = (1 << 31);
+
+			currentPick.push_back(input);
+			generatePermutations(picksLeft, currentPick);
+			currentPick.erase(currentPick.end() - 1);
+			picksLeft[i] = input;
+			++picksLeftCount;
+		}
+	}
+
+	if(picksLeftCount == 0)
 	{
 		permutations.push_back(currentPick);
 		return;
-	}
-
-	for(int i = 0; i < picksLeft.size(); ++i)
-	{
-		std::vector<int> leftOnes = picksLeft;
-		int input = leftOnes[i];
-		leftOnes.erase(leftOnes.begin() + i);
-
-		std::vector<int> nextOne = currentPick;
-
-		nextOne.push_back(input);
-		generatePermutations(leftOnes, nextOne);
 	}
 
 	return;
@@ -340,12 +344,16 @@ int main(int argc, char** argv)
 	}
 
 	// part a
-	generatePermutations({0, 1, 2, 3, 4}, {});
+	std::vector<int> picks;
+	std::vector<int> permNumbers = {0, 1, 2, 3 , 4};
+	generatePermutations(permNumbers, picks);
 	printMaxValueWithSequence(values);
 
 	// part b
+	permNumbers = std::vector<int> {5, 6, 7, 8, 9};
+	picks.clear();
 	permutations.clear();
-	generatePermutations({5, 6, 7, 8, 9}, {});
+	generatePermutations(permNumbers, picks);
 	printMaxValueWithSequence(values);
 
 	return 0;
