@@ -1,118 +1,99 @@
-
-use std::{collections::HashSet, fs::File};
+use std::fs::File;
 use std::io::{self, BufRead};
-use std::path::Path;
 
+enum OpCode 
+{
+	OpNop,
+	OpAdd,
+	OpJmp
+}
 struct Command 
 {
-	name: String,
-	value: i32
+	op: OpCode,
+	value: i32,
 }
 
 fn main() 
 {
 	let mut program: Vec<Command> = Vec::new();
 
-	// File hosts must exist in current path before this produces output
-	if let Ok(lines) = read_lines("src/data.txt")
+	let file = File::open("src/data.txt").unwrap(); 
+	for line in io::BufReader::new(file).lines()
 	{
-		for line in lines 
-		{
-			if let Ok(ip) = line 
-			{
-				let words: Vec<&str> = ip.split_whitespace().collect();
-   
-				let v: i32 = words[1].parse().unwrap();
+		let line = line.unwrap();
+		let words: Vec<&str> = line.split_whitespace().collect();
 
-				program.push(Command{name: words[0].to_string(), value: v});
-			}
-		}
+		let v: i32 = words[1].parse().unwrap();
+		match words[0]
+		{
+			"nop" => program.push(Command{op: OpCode::OpNop, value: v}),
+			"acc" => program.push(Command{op: OpCode::OpAdd, value: v}),
+			"jmp" => program.push(Command{op: OpCode::OpJmp, value: v}),
+			_ => { panic!("unknown opcode"); }
+		};
 	}
 
 	{
-		println!("Part a:");
 		let (_, accum) = exec_program(&program);
-		println!("Accumulated: {}", accum);
+		println!("Part a, accumulated: {}", accum);
 	}
 
 	{
 		for i in 0..program.len()
 		{
-			match program[i].name.as_str()
+			let mut change = true;
+			match program[i].op
 			{
-				"nop" => program[i].name = "jmp".to_string(),
-				"jmp" => program[i].name = "nop".to_string(),
-				_ => {} 
+				OpCode::OpNop => program[i].op = OpCode::OpJmp,
+				OpCode::OpJmp => program[i].op = OpCode::OpNop,
+				OpCode::OpAdd => change = false
 			}
-			
-			let (result, accum) = exec_program(&program);
-			if result == 1
+			if change
 			{
-				println!("Finished: Accumulated: {}", accum);
-				break;
-			}
-			match program[i].name.as_str()
-			{
-				"nop" => program[i].name = "jmp".to_string(),
-				"jmp" => program[i].name = "nop".to_string(),
-				_ => {} 
+				let (result, accum) = exec_program(&program);
+				if result == 1
+				{
+					println!("Part b, accumulated: {}", accum);
+					break;
+				}
+				match program[i].op
+				{
+					OpCode::OpNop => program[i].op = OpCode::OpJmp,
+					OpCode::OpJmp => program[i].op = OpCode::OpNop,
+					_ => {} 
+				}
 			}
 		}
 	}
-}
-
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where P: AsRef<Path>, 
-{
-	let file = File::open(filename)?; 
-	Ok(io::BufReader::new(file).lines())
 }
 
 fn exec_program(program: &Vec<Command>) -> (i32, i32)
 {
-	let mut result = 0;
-
 	let mut program_ip: i32 = 0;
-	let mut visited_lines: HashSet<i32> = HashSet::new();
 	let mut accum: i32 = 0;
-	while result == 0 
+	let mut visited: Vec<bool> = vec![false; program.len()];
+	loop 
 	{
-		if visited_lines.contains(&program_ip)
+		if program_ip >= program.len() as i32
 		{
-			result = -1;
-			break;
+			return (1, accum);
 		}
-		else if program_ip >= program.len() as i32
+
+		if visited[program_ip as usize]
 		{
-			result = 1;
-			break;
+			return (-1, accum);
 		}
-		visited_lines.insert(program_ip);
-		let val: i32 = program[program_ip as usize].value;
-		match program[program_ip as usize].name.as_str()
+		
+		visited[program_ip as usize] = true;
+
+		let program_line = &program[program_ip as usize];
+		let (new_acc, new_address ) = match program_line.op
 		{
-			"nop" => 
-			{
-				//println!("{} nop", program_ip);
-				program_ip += 1;
-			},
-			"acc" => 
-			{ 
-				//println!("{} acc: {} ", program_ip, val);
-				accum += val;
-				program_ip += 1;
-			},
-			"jmp" =>
-			{
-				//println!("{} jmp to {}", program_ip, program_ip + val);
-				program_ip += val;
-			},
-			_ =>
-			{
-				println!("Unknown command: {}", program[program_ip as usize].name);
-				panic!("Unknown command!");
-			}
-		}
+			OpCode::OpNop => (accum, program_ip + 1),  
+			OpCode::OpAdd => (accum + program_line.value, program_ip + 1),
+			OpCode::OpJmp => (accum, program_ip + program_line.value),
+		};
+		accum = new_acc;
+		program_ip = new_address;
 	}
-	return (result, accum);
 }
