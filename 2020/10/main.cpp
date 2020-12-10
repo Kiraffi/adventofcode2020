@@ -100,21 +100,23 @@ int main(int argc, char** argv)
 	printf("ones: %i and threes: %i, multi: %i\n", ones, threes, ones * threes);
 
 
-	int64_t multiplier = 1;
 	numbers.insert(numbers.begin(), 0);
-	std::vector<int64_t> visiteds(numbers.size(), 0);
-	visiteds[0] = 1;
+	std::vector<int64_t> rollingBuffer(4, 0);
+	int64_t currentCount = 0;
+	rollingBuffer[0] = 1;
 	for(int i = 0; i < numbers.size(); ++i)
 	{
+		currentCount = rollingBuffer[i % 4];
+		rollingBuffer[i % 4] = 0;
 		int j = i + 1;
 		while(j < numbers.size() && numbers[j] - numbers[i] <= 3)
 		{
-			visiteds[j] += visiteds[i];
+			rollingBuffer[j % 4] += currentCount;
 			++j;
 		}
 	}
 
-	printf("Combinations: % " PRIi64 "\n", visiteds[visiteds.size() - 1]);
+	printf("Combinations: % " PRIi64 "\n", currentCount);
 
 	return 0;
 }
