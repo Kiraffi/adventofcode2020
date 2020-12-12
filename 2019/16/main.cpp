@@ -96,7 +96,7 @@ std::vector<uint8_t> calculateFFTOrig(const std::vector<uint8_t> &readNumbers, i
 
 
 
-std::vector<uint8_t> calculateFFT(const std::vector<uint8_t> &readNumbers, int repeatAmount)
+std::vector<uint8_t> calculateFFT(const std::vector<uint8_t> &readNumbers, int repeatAmount, int64_t upToNumber)
 {
 	std::vector<uint8_t> allNumbers;
 	allNumbers.reserve(readNumbers.size() * repeatAmount);
@@ -125,7 +125,7 @@ std::vector<uint8_t> calculateFFT(const std::vector<uint8_t> &readNumbers, int r
 			counters.clear();
 			counters.push_back(sz - 1);
 
-			while(counters[0] >= 0)
+			while(counters[0] >= upToNumber)
 			{
 				int64_t j = counters[0];
 				int counterSz = counters.size();
@@ -161,21 +161,6 @@ std::vector<uint8_t> calculateFFT(const std::vector<uint8_t> &readNumbers, int r
 					break;
 				counters[0] = j;
 			}
-			int64_t tmpStartSum = 0;
-			for(int64_t pp2 = 0; pp2 < counters[0]; ++pp2)
-			{
-				uint64_t divider = pp2 + 1;
-				int64_t m = seq[(pp2 / divider + 1) % 4]; 
-				tmpStartSum += m * readNumbers[pp2];
-				sum = tmpStartSum;
-				for(int64_t pp = pp2 + 1 + divider; pp < origCount * divider; ++pp)
-				{
-					m = seq[(pp / divider + 1) % 4]; 
-					sum += m * readNumbers[pp];
-					if(m == 0) pp += divider - 1;
-				}
-				writeNumbers[pp2] = sum;
-			}
 			indexRead = (indexRead + 1) & 1; 
 			indexWrite = (indexWrite + 1) & 1;
 		}
@@ -200,11 +185,11 @@ int main(int argc, char** argv)
 
 	//for(int j = 2; j < 9; ++j)
 	{
-	std::vector<uint8_t> partB = calculateFFT(readNumbers, 10000);
 	printf("Part b:");
 	int offset = 0;
 	for(int i = 0; i < 7; ++i)
 		offset = offset * 10 + readNumbers[i];
+	std::vector<uint8_t> partB = calculateFFT(readNumbers, 10000, offset);
 	//offset = 0;
 	printOutput(partB, offset);
 	}
