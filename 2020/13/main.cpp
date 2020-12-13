@@ -90,7 +90,7 @@ void partA(const std::vector<int64_t> &numbers)
 	int64_t shortestTime = (int64_t(1) << int64_t(60));
 	int64_t shortestTimeBus = 0;
 
-	for(int i = 0; i < numbers.size(); ++i)
+	for(int i = 1; i < numbers.size(); ++i)
 	{
 		
 		int64_t interval = numbers[i];
