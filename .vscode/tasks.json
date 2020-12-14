@@ -8,7 +8,8 @@
                 "-g",
                 "${file}",
                 "-o",
-                "${fileDirname}/a.out"
+				"${fileDirname}/a.out",
+				"-std=c++17"
             ],
             "options": {
                 "cwd": "/usr/bin"
