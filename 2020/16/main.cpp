@@ -10,11 +10,16 @@
 #include <unordered_map>
 #include <vector>
 
+struct MinMax
+{
+	int minValue;
+	int maxValue;
+};
+
 struct NameType
 {
 	std::string name;
-	std::vector<int> mins;
-	std::vector<int> maxes;
+	std::vector<MinMax> minMaxes;
 };
 
 std::string parseStringUntil(const char **ptr, char parseChar)
@@ -93,55 +98,62 @@ void findSpace(const char **ptr)
 		p++;
 }
 
-// zeros don't add sum but are invalid...
-bool checkValidNumbers(const std::string &s, const std::vector<NameType> &nameTypes, int64_t &outv)
+int getFirstSetBit(int64_t v)
 {
-	outv = 0;
-	const char *ptr = s.data();
-	bool valid = true;
-	while(*ptr != '\0')
+	int bitCount = 0;
+	assert(v != 0);
+	while((v & 1) == 0)
 	{
-		int number = parseNumber(&ptr);
-		bool found = false;
-		for(const auto &a : nameTypes)
-		{
-			for(int i = 0; i < a.mins.size(); ++i)
-			{
-				if(number >= a.mins[i] && number <= a.maxes[i])
-				{
-					found = true;
-					break;
-				}
-			}
-			if(found)
-				break;
-		}
-		if(!found)
-		{
-			outv += number;
-			valid = false;
-		}
+		++bitCount;
+		v = v >> 1;
 	}
-	return valid;
+	return bitCount;
 }
 
-void removeInvalidNumbers(const std::string &s, const std::vector<NameType> &nameTypes, 
-	std::vector<std::vector<int>> &validNumbers)
+int64_t removeInvalidNumbers(const std::string &s, const std::vector<NameType> &nameTypes, 
+	std::vector<int> &validNumbers)
 {
+	int64_t sum = 0;
 	int numberIndex = 0;
 	const char *ptr = s.data();
 	while(*ptr != '\0')
 	{
+		int removes = 0;
 		int number = parseNumber(&ptr);
-		bool found = false;
-		std::vector<int> &p = validNumbers[numberIndex];
-		for(int j = p.size() - 1; j >= 0; --j)
+		bool foundAny = false;
+		int i = 0;
+		for(; i < nameTypes.size(); ++i)
 		{
-			const NameType &a = nameTypes[p[j]];
-			bool found = false;
-			for(int i = 0; i < a.mins.size(); ++i)
+			for(const auto &m : nameTypes[i].minMaxes)
 			{
-				if(number >= a.mins[i] && number <= a.maxes[i])
+				if(number >= m.minValue && number <= m.maxValue)
+				{
+					foundAny = true;
+					goto foundAnyOne;
+				}
+			}
+			// add the bits to remove if any is found
+			removes |= (1 << i);
+		}
+		if(!foundAny)
+		{
+			sum += number;
+			++numberIndex;
+			continue;
+		}
+		foundAnyOne:
+		int &p = validNumbers[numberIndex];
+		p &= ~removes;
+		for(; i < 31 && p; ++i)
+		{
+			if(((p >> i) & 1) == 0)
+				continue;
+
+			const NameType &a = nameTypes[i];
+			bool found = false;
+			for(const auto &m : a.minMaxes)
+			{
+				if(number >= m.minValue && number <= m.maxValue)
 				{
 					found = true;
 					break;
@@ -149,23 +161,14 @@ void removeInvalidNumbers(const std::string &s, const std::vector<NameType> &nam
 			}
 			if(!found)
 			{
-				assert(p.size() > 1);
-				p.erase(p.begin() + j);
+				p &= ~(1 << i);
+				// Check that we dont remove last bit
+				assert(p != 0);
 			}
 		}
 		++numberIndex;
 	}
-}
-
-
-
-
-std::vector<int> generateNumbers(int upTo)
-{
-	std::vector<int> v(upTo, 0);
-	for(int i = 0; i < upTo; ++i)
-		v[i] = i;
-	return v;
+	return sum;
 }
 
 int readValues(const char *filename)
@@ -189,19 +192,20 @@ int readValues(const char *filename)
 		NameType n;
 		n.name = parseStringUntil(&ptr, ':');
 		++ptr;
-		n.mins.push_back(parseNumber(&ptr));
-		n.maxes.push_back(parseNumber(&ptr));
+		int minV = parseNumber(&ptr);
+		int maxV = parseNumber(&ptr);
+		n.minMaxes.push_back({minV, maxV});
 		ptr += 3;
-		n.mins.push_back(parseNumber(&ptr));
-		n.maxes.push_back(parseNumber(&ptr));
+		minV = parseNumber(&ptr);
+		maxV = parseNumber(&ptr);
+		n.minMaxes.push_back({minV, maxV});
 		nameTypes.push_back(n);
 	}
 	getline(f, s);
 	getline(f, s);
-	std::vector<std::vector<int>> validNumbers(nameTypes.size(), generateNumbers(nameTypes.size()));
+	std::vector<int> validNumbers(nameTypes.size(), (1 << nameTypes.size()) - 1);
 	int64_t sum = 0;
 	std::vector<int> myTicketNumbers = parseNumbers(s);
-	checkValidNumbers(s, nameTypes, sum);
 	removeInvalidNumbers(s, nameTypes, validNumbers);
 	getline(f, s);
 	getline(f, s);
@@ -210,12 +214,7 @@ int readValues(const char *filename)
 
 	while(getline(f, s))
 	{
-		int64_t v = 0; 
-		if(checkValidNumbers(s, nameTypes, v))
-		{
-			removeInvalidNumbers(s, nameTypes, validNumbers);
-		}
-		sum += v;
+		sum += removeInvalidNumbers(s, nameTypes, validNumbers); 
 	}
 
 	f.close();
@@ -231,22 +230,17 @@ int readValues(const char *filename)
 		stupidDelete = false;
 		for(int i = 0; i < validNumbers.size(); ++i)
 		{
-			if(validNumbers[i].size() != 1)
+			int deleteValue = getFirstSetBit(validNumbers[i]);
+			// Check that only one bit is set.
+			if((validNumbers[i] - (1 << deleteValue)) != 0)
 				continue;
-			int deleteValue = validNumbers[i][0];
 			for(int j = 0; j < validNumbers.size(); ++j)
 			{
 				if(i == j)
 					continue;
-				std::vector<int> &a = validNumbers[j]; 
-				for(int k = a.size() - 1; k >= 0; --k)
-				{
-					if(a[k] == deleteValue)
-					{
-						stupidDelete = true;
-						a.erase(a.begin() + k);
-					}
-				}
+				int &a = validNumbers[j];
+				stupidDelete |= (a >> deleteValue) & 1 == 1;
+				a &= ~(1 << deleteValue);
 			}
 		}
 	}
@@ -255,7 +249,7 @@ int readValues(const char *filename)
 
 	for(int i = 0; i < validNumbers.size(); ++i)
 	{
-		int j = validNumbers[i][0];
+		int j = getFirstSetBit(validNumbers[i]);
 		if(nameTypes[j].name.compare(0, 9, "departure") == 0)
 			multi *= myTicketNumbers[i];
 	}
