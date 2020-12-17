@@ -134,10 +134,11 @@ int64_t removeInvalids(const std::string &s, const std::vector<NameType> &nameTy
 		++numberIndex;
 
 		bool foundAny = false;
-		int i = 0;
 		int removes = 0;
-		for(; p >> i; ++i)
+		for(int i = 0; p >> i; ++i)
 		{
+			if(( (p >> i ) & 1) == 0)
+				continue;
 			const NameType &a = nameTypes[i];
 			if((number >= a.minMaxes[0].minValue && number <= a.minMaxes[0].maxValue) || 
 				(number >= a.minMaxes[1].minValue && number <= a.minMaxes[1].maxValue))
@@ -213,23 +214,24 @@ int readValues(const char *filename)
 
 	// just keep removing indices that have multiple hits, until we have 1 hit for
 	// everything
-	bool stupidDelete = true;
-	while(stupidDelete)
+	bool hasMultipleBitsSet = true;
+	while(hasMultipleBitsSet)
 	{
-		stupidDelete = false;
+		hasMultipleBitsSet = false;
 		for(int i = 0; i < validNumbers.size(); ++i)
 		{
 			int deleteValue = getFirstSetBit(validNumbers[i]);
 			// Check that only one bit is set.
 			if((validNumbers[i] - (1 << deleteValue)) != 0)
+			{
+				hasMultipleBitsSet = true;
 				continue;
+			}
 			for(int j = 0; j < validNumbers.size(); ++j)
 			{
 				if(i == j)
 					continue;
-				int &a = validNumbers[j];
-				stupidDelete |= (a >> deleteValue) & 1 == 1;
-				a &= ~(1 << deleteValue);
+				validNumbers[j] &= ~(1 << deleteValue);
 			}
 		}
 	}
