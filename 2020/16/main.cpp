@@ -19,7 +19,7 @@ struct MinMax
 struct NameType
 {
 	std::string name;
-	std::vector<MinMax> minMaxes;
+	MinMax minMaxes[2];
 };
 
 std::string parseStringUntil(const char **ptr, char parseChar)
@@ -78,17 +78,27 @@ int64_t parseNumber(const char **ptr)
 	return neg ? -number : number;
 }
 
-std::vector<int> parseNumbers(const std::string &s)
+
+std::vector<int> parseNumbers(const char **ptr)
 {
 	std::vector<int> result;
-	const char *ptr = s.data();
+	const char *&p = ptr[0];
 	bool valid = true;
-	while(*ptr != '\0')
+	while(*p != '\0')
 	{
-		result.push_back(parseNumber(&ptr));
+		while(!isdigit(*p) && *p != '\0' && *p != '-') ++p;
+		if(*p == '\0')
+			break;
+		result.push_back(parseNumber(&p));
 	}
 	return result;
 }
+std::vector<int> parseNumbers(const std::string &s)
+{
+	const char *ptr = s.data();
+	return parseNumbers(&ptr);
+}
+
 void findSpace(const char **ptr)
 {
 	const char *&p = ptr[0];
@@ -110,7 +120,7 @@ int getFirstSetBit(int64_t v)
 	return bitCount;
 }
 
-int64_t removeInvalidNumbers(const std::string &s, const std::vector<NameType> &nameTypes, 
+int64_t removeInvalids(const std::string &s, const std::vector<NameType> &nameTypes, 
 	std::vector<int> &validNumbers)
 {
 	int64_t sum = 0;
@@ -118,55 +128,40 @@ int64_t removeInvalidNumbers(const std::string &s, const std::vector<NameType> &
 	const char *ptr = s.data();
 	while(*ptr != '\0')
 	{
-		int removes = 0;
 		int number = parseNumber(&ptr);
+
+		int &p = validNumbers[numberIndex];
+		++numberIndex;
+
 		bool foundAny = false;
 		int i = 0;
-		for(; i < nameTypes.size(); ++i)
+		int removes = 0;
+		for(; p >> i; ++i)
 		{
-			for(const auto &m : nameTypes[i].minMaxes)
+			const NameType &a = nameTypes[i];
+			if((number >= a.minMaxes[0].minValue && number <= a.minMaxes[0].maxValue) || 
+				(number >= a.minMaxes[1].minValue && number <= a.minMaxes[1].maxValue))
 			{
-				if(number >= m.minValue && number <= m.maxValue)
-				{
-					foundAny = true;
-					goto foundAnyOne;
-				}
+				foundAny = true;
 			}
-			// add the bits to remove if any is found
-			removes |= (1 << i);
+			else
+			{
+				removes |= (1 << i);
+			}
+			
 		}
+		// didnt find any matching field
 		if(!foundAny)
 		{
 			sum += number;
-			++numberIndex;
-			continue;
 		}
-		foundAnyOne:
-		int &p = validNumbers[numberIndex];
-		p &= ~removes;
-		for(; i < 31 && p; ++i)
+		// if we found at least one matching remove the non matching ones.
+		else
 		{
-			if(((p >> i) & 1) == 0)
-				continue;
-
-			const NameType &a = nameTypes[i];
-			bool found = false;
-			for(const auto &m : a.minMaxes)
-			{
-				if(number >= m.minValue && number <= m.maxValue)
-				{
-					found = true;
-					break;
-				}
-			}
-			if(!found)
-			{
-				p &= ~(1 << i);
-				// Check that we dont remove last bit
-				assert(p != 0);
-			}
+			p &= ~removes;
+			// Check that we dont remove last bit
+			assert(p != 0);			
 		}
-		++numberIndex;
 	}
 	return sum;
 }
@@ -189,24 +184,18 @@ int readValues(const char *filename)
 		const char *ptr = s.data();
 		if(*ptr == '\0')
 			break;
-		NameType n;
+		nameTypes.emplace_back(NameType{});
+		NameType &n = nameTypes[nameTypes.size() - 1];
 		n.name = parseStringUntil(&ptr, ':');
-		++ptr;
-		int minV = parseNumber(&ptr);
-		int maxV = parseNumber(&ptr);
-		n.minMaxes.push_back({minV, maxV});
-		ptr += 3;
-		minV = parseNumber(&ptr);
-		maxV = parseNumber(&ptr);
-		n.minMaxes.push_back({minV, maxV});
-		nameTypes.push_back(n);
+		std::vector<int> numbers = parseNumbers(ptr);
+		n.minMaxes[0] = {numbers[0], numbers[1]};
+		n.minMaxes[1] = {numbers[2], numbers[3]};
 	}
 	getline(f, s);
 	getline(f, s);
 	std::vector<int> validNumbers(nameTypes.size(), (1 << nameTypes.size()) - 1);
-	int64_t sum = 0;
 	std::vector<int> myTicketNumbers = parseNumbers(s);
-	removeInvalidNumbers(s, nameTypes, validNumbers);
+	int64_t sum = removeInvalids(s, nameTypes, validNumbers);
 	getline(f, s);
 	getline(f, s);
 
@@ -214,7 +203,7 @@ int readValues(const char *filename)
 
 	while(getline(f, s))
 	{
-		sum += removeInvalidNumbers(s, nameTypes, validNumbers); 
+		sum += removeInvalids(s, nameTypes, validNumbers); 
 	}
 
 	f.close();
