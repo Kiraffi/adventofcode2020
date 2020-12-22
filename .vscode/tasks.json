@@ -9,7 +9,7 @@
                 "${file}",
                 "-o",
 				"${fileDirname}/a.out",
-				"-std=c++17"
+				"-std=c++2a"
             ],
             "options": {
                 "cwd": "/usr/bin"
